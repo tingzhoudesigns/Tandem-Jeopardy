@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tandem Jeopardy!</title>
+<style>
+  :root {
+    --bg: #0d0e11;
+    --cell-blue-1: #46689c;
+    --cell-blue-2: #35507c;
+    --cell-blue-header: #3d5a8c;
+    --cell-edge: #5d7fb3;
+    --gold: #FFB60A;
+    --gold-soft: #f5c95e;
+    --white: #f5f6f8;
+    --muted: #9aa3b2;
+    --correct: #3fae6a;
+    --incorrect: #d64550;
+    --panel: #16181d;
+    --panel-edge: #2a2e38;
+    font-size: 16px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--white);
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  button { font-family: inherit; cursor: pointer; }
+  button:focus-visible, input:focus-visible {
+    outline: 3px solid var(--gold);
+    outline-offset: 2px;
+  }
+
+  #app {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 20px 18px 40px;
+    min-height: 100%;
+  }
+
+  /* ---------- Shared ---------- */
+  .game-title {
+    text-align: center;
+    color: var(--gold);
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    font-size: clamp(1.8rem, 5vw, 3.2rem);
+    text-shadow: 0 2px 18px rgba(255, 182, 10, 0.25);
+    margin: 10px 0 6px;
+  }
+  .subtitle {
+    text-align: center;
+    color: var(--muted);
+    font-size: clamp(0.85rem, 2vw, 1rem);
+    margin-bottom: 26px;
+  }
+  .btn-primary {
+    display: inline-block;
+    background: linear-gradient(180deg, var(--gold), #e09c00);
+    color: #1a1300;
+    border: none;
+    border-radius: 10px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    padding: 14px 44px;
+    box-shadow: 0 4px 16px rgba(255, 182, 10, 0.3);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 6px 22px rgba(255,182,10,0.4); }
+  .btn-primary:disabled {
+    background: #3a3d45; color: #777d89; box-shadow: none; cursor: not-allowed; transform: none;
+  }
+  .btn-secondary {
+    background: transparent;
+    color: var(--gold-soft);
+    border: 2px solid var(--cell-edge);
+    border-radius: 10px;
+    font-size: 1rem;
+    font-weight: 600;
+    padding: 12px 30px;
+    transition: border-color 0.12s ease, color 0.12s ease;
+  }
+  .btn-secondary:hover { border-color: var(--gold); color: var(--gold); }
+  .center { text-align: center; }
+
+  /* ---------- Intro ---------- */
+  .intro-wrap {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 78vh; text-align: center;
+  }
+  .intro-rules {
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 14px;
+    padding: 22px 28px;
+    margin: 26px 0 34px;
+    max-width: 560px;
+    text-align: left;
+    line-height: 1.65;
+    color: #cdd3dd;
+    font-size: 0.98rem;
+  }
+  .intro-rules strong { color: var(--gold-soft); }
+  .intro-buttons { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+
+  /* ---------- Setup ---------- */
+  .setup-wrap { max-width: 560px; margin: 0 auto; }
+  .setup-section { margin-bottom: 30px; }
+  .setup-label {
+    display: block;
+    color: var(--gold-soft);
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-bottom: 12px;
+  }
+  .count-row { display: flex; gap: 12px; }
+  .count-btn {
+    flex: 1;
+    background: linear-gradient(180deg, var(--cell-blue-1), var(--cell-blue-2));
+    border: 2px solid transparent;
+    border-radius: 10px;
+    color: var(--white);
+    font-size: 1.4rem;
+    font-weight: 700;
+    padding: 14px 0;
+    transition: border-color 0.12s ease, transform 0.12s ease;
+  }
+  .count-btn:hover { transform: translateY(-2px); }
+  .count-btn.selected { border-color: var(--gold); color: var(--gold); }
+  .name-input {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--panel-edge);
+    border-radius: 10px;
+    color: var(--white);
+    font-size: 1.05rem;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  .name-input::placeholder { color: #5c6472; }
+  .setup-tip {
+    background: rgba(255, 182, 10, 0.07);
+    border-left: 3px solid var(--gold);
+    border-radius: 0 8px 8px 0;
+    color: #d8c9a0;
+    font-size: 0.9rem;
+    line-height: 1.55;
+    padding: 12px 16px;
+    margin-bottom: 30px;
+  }
+
+  /* ---------- Board ---------- */
+  .board-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    flex-wrap: wrap; gap: 8px; margin-bottom: 14px;
+  }
+  .board-title {
+    color: var(--gold);
+    font-weight: 800;
+    font-size: clamp(1.3rem, 3.4vw, 2rem);
+    text-shadow: 0 2px 14px rgba(255,182,10,0.2);
+  }
+  .restart-btn {
+    background: transparent; border: 1px solid var(--panel-edge);
+    color: var(--muted); border-radius: 8px; font-size: 0.82rem; padding: 6px 14px;
+  }
+  .restart-btn:hover { color: var(--white); border-color: var(--muted); }
+
+  .scoreboard {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;
+  }
+  .team-chip {
+    flex: 1 1 130px;
+    background: var(--panel);
+    border: 2px solid var(--panel-edge);
+    border-radius: 12px;
+    padding: 10px 14px;
+    min-width: 120px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .team-chip.active {
+    border-color: var(--gold);
+    box-shadow: 0 0 18px rgba(255, 182, 10, 0.18);
+  }
+  .team-chip .t-name {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 0.88rem; font-weight: 600; color: #cdd3dd;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .team-chip.active .t-name { color: var(--gold); }
+  .team-chip .t-score { font-size: 1.5rem; font-weight: 800; color: var(--white); margin-top: 2px; }
+  .team-chip.active .t-score { color: var(--gold); }
+  .turn-marker { font-size: 0.75rem; }
+
+  .turn-banner {
+    color: var(--muted); font-size: 0.95rem; margin-bottom: 14px;
+  }
+  .turn-banner strong { color: var(--gold); }
+
+  .board-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: clamp(5px, 0.9vw, 10px);
+  }
+  .cat-header {
+    background: linear-gradient(180deg, var(--cell-blue-header), var(--cell-blue-2));
+    border-top: 1px solid var(--cell-edge);
+    border-radius: 6px;
+    color: var(--white);
+    font-weight: 700;
+    font-size: clamp(0.62rem, 1.55vw, 1.05rem);
+    text-align: center;
+    padding: clamp(10px, 1.6vw, 18px) 4px;
+    letter-spacing: 0.02em;
+    text-transform: none;
+  }
+  .cell {
+    perspective: 700px;
+    aspect-ratio: 2.1 / 1;
+  }
+  .cell-inner {
+    position: relative; width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.55s cubic-bezier(0.4, 0.1, 0.25, 1);
+  }
+  .cell.flipped .cell-inner { transform: rotateY(180deg); }
+  .cell-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .cell-front {
+    background: linear-gradient(180deg, var(--cell-blue-1), var(--cell-blue-2));
+    border-top: 1px solid var(--cell-edge);
+    color: var(--gold);
+    font-size: clamp(1rem, 2.6vw, 1.9rem);
+    font-weight: 800;
+    border: none;
+    width: 100%; height: 100%;
+    transition: filter 0.15s ease, transform 0.15s ease;
+  }
+  .cell:not(.flipped) .cell-front:hover { filter: brightness(1.18); transform: scale(1.02); }
+  .cell-back {
+    background: #14161b;
+    border: 1px solid var(--panel-edge);
+    transform: rotateY(180deg);
+    flex-direction: column;
+    gap: 2px;
+  }
+  .cell-back .taken-by {
+    font-size: clamp(0.6rem, 1.3vw, 0.82rem);
+    font-weight: 700;
+    max-width: 90%;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cell-back .taken-pts { font-size: clamp(0.7rem, 1.6vw, 1rem); font-weight: 800; }
+  .cell-back.got { color: var(--gold-soft); }
+  .cell-back.missed { color: #6a7180; }
+
+  /* ---------- Question overlay ---------- */
+  .q-overlay {
+    position: fixed; inset: 0;
+    background: rgba(8, 9, 12, 0.96);
+    display: flex; align-items: center; justify-content: center;
+    padding: 18px;
+    z-index: 50;
+    overflow-y: auto;
+  }
+  .q-card {
+    background: linear-gradient(180deg, #1a2a44, #14203a);
+    border: 1px solid var(--cell-edge);
+    border-radius: 16px;
+    max-width: 760px;
+    width: 100%;
+    padding: clamp(20px, 4vw, 40px);
+    margin: auto;
+    box-shadow: 0 12px 60px rgba(0,0,0,0.6);
+  }
+  .q-meta {
+    display: flex; justify-content: space-between; align-items: baseline;
+    flex-wrap: wrap; gap: 6px;
+    margin-bottom: 16px;
+  }
+  .q-cat { color: var(--gold); font-weight: 800; font-size: 1.1rem; letter-spacing: 0.03em; }
+  .q-answering { color: var(--muted); font-size: 0.9rem; }
+  .q-answering strong { color: var(--white); }
+  .q-text {
+    font-size: clamp(1.1rem, 2.6vw, 1.5rem);
+    font-weight: 700;
+    line-height: 1.45;
+    margin-bottom: 8px;
+  }
+  .q-hint { color: var(--gold-soft); font-size: 0.88rem; font-weight: 600; margin-bottom: 18px; }
+  .q-hint.spacer { margin-bottom: 18px; visibility: hidden; }
+  .options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+  .option-btn {
+    display: flex; align-items: center; gap: 12px;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    color: var(--white);
+    font-size: 1.02rem;
+    line-height: 1.4;
+    padding: 13px 16px;
+    transition: border-color 0.12s ease, background 0.12s ease;
+  }
+  .option-btn:hover:not(:disabled) { border-color: var(--gold-soft); background: rgba(255,255,255,0.09); }
+  .option-btn.selected {
+    border-color: var(--gold);
+    background: rgba(255, 182, 10, 0.12);
+  }
+  .option-btn:disabled { cursor: default; }
+  .option-btn .marker {
+    flex: 0 0 auto;
+    width: 24px; height: 24px;
+    border: 2px solid rgba(255,255,255,0.35);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 800;
+    color: transparent;
+  }
+  .option-btn .marker.round { border-radius: 50%; }
+  .option-btn .marker.square { border-radius: 5px; }
+  .option-btn.selected .marker { border-color: var(--gold); color: var(--gold); }
+  .option-btn.reveal-correct {
+    border-color: var(--correct);
+    background: rgba(63, 174, 106, 0.14);
+  }
+  .option-btn.reveal-correct .marker { border-color: var(--correct); color: var(--correct); }
+  .option-btn.reveal-wrong {
+    border-color: var(--incorrect);
+    background: rgba(214, 69, 80, 0.13);
+  }
+  .option-btn.reveal-wrong .marker { border-color: var(--incorrect); color: var(--incorrect); }
+
+  .result-banner {
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1.05rem;
+    padding: 14px 18px;
+    margin-bottom: 22px;
+    line-height: 1.45;
+  }
+  .result-banner.win { background: rgba(63, 174, 106, 0.15); border: 1px solid var(--correct); color: #7fd8a4; }
+  .result-banner.lose { background: rgba(214, 69, 80, 0.13); border: 1px solid var(--incorrect); color: #f0929a; }
+
+  /* ---------- Final ---------- */
+  .final-wrap { max-width: 620px; margin: 0 auto; text-align: center; }
+  .final-list { margin: 30px 0 36px; display: flex; flex-direction: column; gap: 12px; }
+  .final-row {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--panel);
+    border: 2px solid var(--panel-edge);
+    border-radius: 14px;
+    padding: 16px 22px;
+    text-align: left;
+  }
+  .final-row.winner {
+    border-color: var(--gold);
+    background: linear-gradient(180deg, rgba(255,182,10,0.1), rgba(255,182,10,0.03));
+    box-shadow: 0 0 26px rgba(255, 182, 10, 0.15);
+  }
+  .final-rank {
+    flex: 0 0 auto;
+    width: 46px; height: 46px;
+    border-radius: 50%;
+    background: var(--cell-blue-2);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; font-weight: 800; color: var(--white);
+  }
+  .final-row.winner .final-rank { background: var(--gold); color: #1a1300; }
+  .final-name { flex: 1; font-size: 1.15rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+  .final-score { font-size: 1.35rem; font-weight: 800; color: var(--gold); }
+  .final-crown { font-size: 1.3rem; }
+
+  @media (max-width: 640px) {
+    .cell { aspect-ratio: 1.6 / 1; }
+    .team-chip { flex: 1 1 100px; min-width: 96px; padding: 8px 10px; }
+    .team-chip .t-score { font-size: 1.2rem; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+    .cell-inner { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* =====================================================================
+   TANDEM JEOPARDY! — QUESTION DATA BLOCK
+   =====================================================================
+   HOW TO EDIT (directly on GitHub is fine):
+   - Each question is one object in the QUESTIONS array below.
+   - Fields:
+       category : must match one of the CATEGORIES exactly
+       points   : 200 | 400 | 600 | 800 | 1000
+       type     : "mc" = multiple choice (one correct)
+                  "ma" = multiple answer (select all; all-or-nothing)
+                  "tf" = true/false
+       question : the question text (plain string)
+       options  : array of answer options, in display order
+       correct  : array of the INDEX POSITIONS of correct options
+                  (0 = first option, 1 = second, etc.)
+                  "mc"/"tf" have exactly one index; "ma" has 2+.
+   - Questions marked ⚠️ PLACEHOLDER below still need real content.
+   - The game auto-shows "Select all that apply" for type "ma";
+     you do not need to write it into the question text.
+   - If you change questions AFTER a game was saved in the browser,
+     bump DATA_VERSION by 1 so old saved games are discarded.
+   ===================================================================== */
+
+const DATA_VERSION = 1;
+
+const CATEGORIES = ["General", "History", "Product", "Culture", "Diabetes"];
+
+const QUESTIONS = [
+
+  /* ---------------- GENERAL ---------------- */
+  {
+    category: "General", points: 200, type: "mc",
+    question: "Where is Tandem HQ located?",
+    options: ["Irvine, CA", "San Diego, CA", "St-Sulpice, Switzerland", "Los Angeles, CA"],
+    correct: [1]
+  },
+  {
+    category: "General", points: 400, type: "mc",
+    question: "What is Tandem\u2019s official color?",
+    options: ["Blue", "Red", "Green", "Yellow"],
+    correct: [0]
+  },
+  {
+    category: "General", points: 600, type: "mc",
+    question: "Which of the following is Tandem\u2019s main manufacturing site?",
+    options: ["High Bluff", "Barnes Canyon", "Irvine", "Marindustry"],
+    correct: [1]
+  },
+  {
+    category: "General", points: 800, type: "mc",
+    question: "Where can you access the Tandem Organization Chart to know more about other departments and employees?",
+    options: ["On Tandem\u2019s official website", "In the Workday System", "Google search", "The only way is to contact HR department"],
+    correct: [1]
+  },
+  {
+    category: "General", points: 1000, type: "mc",
+    question: "Who is Tandem\u2019s Chief Administrative Officer?",
+    options: ["Leigh Vosseller", "Shannon Hansen", "Susan Morrison", "Rick Carpenter"],
+    correct: [2]
+  },
+
+  /* ---------------- HISTORY ---------------- */
+  {
+    category: "History", points: 200, type: "tf",
+    question: "Tandem was founded by a group of medical doctors in 2006.",
+    options: ["True", "False"],
+    correct: [1]
+  },
+  {
+    category: "History", points: 400, type: "mc",
+    question: "When did Tandem announce the United States commercial launch of its Mobi pump?",
+    options: ["2012", "2016", "2020", "2024"],
+    correct: [3]
+  },
+  {
+    category: "History", points: 600, type: "mc",
+    question: "When did Tandem go IPO?",
+    options: ["2003", "2013", "2023", "2026"],
+    correct: [1]
+  },
+  {
+    category: "History", points: 800, type: "mc",
+    question: "When did Tandem acquire Sugarmate, a popular mobile app for people with diabetes who use insulin?",
+    options: ["2012", "2016", "2020", "2024"],
+    correct: [2]
+  },
+  {
+    category: "History", points: 1000, type: "mc",
+    question: "What\u2019s the original name of Tandem?",
+    options: ["Fluit, Inc", "Phluit, Inc", "Fluid, Inc", "Phluid, Inc"],
+    correct: [3]
+  },
+
+  /* ---------------- PRODUCT ---------------- */
+  {
+    category: "Product", points: 200, type: "tf",
+    question: "Tandem Mobi has a small touch screen (similar to one on a smart watch).",
+    options: ["True", "False"],
+    correct: [1]
+  },
+  {
+    category: "Product", points: 400, type: "mc",
+    question: "In 2026, Tandem\u2019s pump is powered by what technology?",
+    options: ["Control \u2013 AI", "Control \u2013 IQ", "Tandem \u2013 AI", "Tandem \u2013 IQ"],
+    correct: [1]
+  },
+  { /* 3 options by design */
+    category: "Product", points: 600, type: "mc",
+    question: "Tandem t:slim X2 is compatible with which CGM sensor?",
+    options: ["Dexcom G7", "Abbott FreeStyle Libre 3", "Both Dexcom G7 and Abbott FreeStyle Libre 3"],
+    correct: [2]
+  },
+  {
+    category: "Product", points: 800, type: "mc",
+    question: "Which of the following is NOT Tandem\u2019s partner?",
+    options: ["Abbott", "Capillary Biomedical", "Dexcom", "Unomedical a/s"],
+    correct: [1]
+  },
+  {
+    category: "Product", points: 1000, type: "ma",
+    question: "As of today, Tandem has distribution partners in which of the following countries?",
+    options: ["Bahamas", "Finland", "Saudi Arabia", "Japan"],
+    correct: [0, 1, 2]
+  },
+
+  /* ---------------- CULTURE ---------------- */
+  {
+    category: "Culture", points: 200, type: "tf",
+    question: "Tandem\u2019s culture encourages employees to dress up formally because we are a serious business in the medical industry.",
+    options: ["True", "False"],
+    correct: [1]
+  },
+  {
+    category: "Culture", points: 400, type: "mc",
+    question: "There is a monthly event at Tandem called TBD. What does TBD stand for?",
+    options: ["Tandem Bring-your-kid-to-work Day", "Tandem Bring-your-pet-to-work Day", "Tandem Beer Day", "Tandem Breakfast-at-work Day"],
+    correct: [2]
+  },
+  {
+    category: "Culture", points: 600, type: "mc",
+    question: "How many Words We Live By do we have?",
+    options: ["4", "5", "6", "8"],
+    correct: [1]
+  },
+  {
+    category: "Culture", points: 800, type: "mc",
+    question: "Name any three Words We Live By",
+    options: ["✓ Answered correctly (facilitator selects)", "✗ Could not answer (facilitator selects)", ],
+    correct: [0]
+  },
+  {
+    category: "Culture", points: 1000, type: "ma",
+    question: "EQ is one of the leadership skills at Tandem\u2019s leadership development program. Select the correct components of EQ.",
+    options: ["Self-awareness", "Situation-awareness", "Self-discipline", "Self-management"],
+    correct: [0, 3]
+  },
+
+  /* ---------------- DIABETES ---------------- */
+  {
+    category: "Diabetes", points: 200, type: "tf",
+    question: "Which diabetes is an autoimmune disease where the body attacks its own insulin-producing pancreas cells, meaning zero insulin is made.",
+    options: ["Type 1", "Type 2"],
+    correct: [0]
+  },
+  {
+    category: "Diabetes", points: 400, type: "mc",
+    question: "Which of the following is part is inserted under the skin to deliver insulin?",
+    options: ["Tubing", "Cartridge", "Cannula", "Insulin Reservoir"],
+    correct: [2]
+  },
+  {
+    category: "Diabetes", points: 600, type: "mc",
+    question: "In 2026, Control-IQ+ is available for ages __ (type 1) and above?",
+    options: ["2", "4", "6", "8"],
+    correct: [0]
+  },
+{ 
+  category: "Diabetes", points: 800, type: "ma",
+  question: "Which of the following are common warning signs of hyperglycemia (high blood sugar)?",
+  options: ["Increased thirst", "Frequent urination", "Rapid weight gain", "Fatigue"],
+  correct: [0, 1, 3]
+},
+  {
+    category: "Diabetes", points: 1000, type: "mc",
+    question: "What is a slow and continuous delivery of insulin to keep BG level stable between meals; and what is a quick dose of insulin delivered to cover food eaten or elevated BG?",
+    options: ["✓ Answered correctly (facilitator selects)", "✗ Could not answer (facilitator selects)"],
+    correct: [0]
+  }
+];
+
+/* =====================================================================
+   GAME ENGINE — no edits needed below this line
+   ===================================================================== */
+
+const POINT_ROWS = [200, 400, 600, 800, 1000];
+const STORAGE_KEY = "tandemJeopardyState";
+
+let state = {
+  screen: "intro",        // intro | setup | board | final
+  teamCount: 4,
+  teams: [],              // [{ name, score }]
+  currentTeam: 0,
+  answered: {},           // qIndex -> { team: index, correct: bool }
+  setupNames: []          // scratch during setup
+};
+
+// Question overlay state (not persisted; a refresh mid-question simply
+// returns to the board with that cell still open)
+let activeQ = null;       // question index or null
+let selection = new Set();
+let revealed = false;
+let lastResult = null;    // { correct, points }
+
+/* ---------- Persistence (safe no-op where storage is unavailable) ---------- */
+function saveState() {
+  try {
+    const payload = {
+      v: DATA_VERSION,
+      screen: state.screen,
+      teamCount: state.teamCount,
+      teams: state.teams,
+      currentTeam: state.currentTeam,
+      answered: state.answered
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch (e) { /* storage unavailable (e.g., preview environment) — game continues without saving */ }
+}
+function loadSavedState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (data.v !== DATA_VERSION) return null;
+    if (!Array.isArray(data.teams) || data.teams.length < 3) return null;
+    return data;
+  } catch (e) { return null; }
+}
+function clearSavedState() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* no-op */ }
+}
+
+/* ---------- Helpers ---------- */
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function qIndexFor(catIdx, points) {
+  return QUESTIONS.findIndex(q => q.category === CATEGORIES[catIdx] && q.points === points);
+}
+function allAnswered() {
+  return Object.keys(state.answered).length >= QUESTIONS.length;
+}
+function advanceTurn() {
+  state.currentTeam = (state.currentTeam + 1) % state.teams.length;
+}
+function shortName(name, max) {
+  return name.length > max ? name.slice(0, max - 1) + "\u2026" : name;
+}
+
+/* ---------- Renderers ---------- */
+const app = document.getElementById("app");
+
+function render() {
+  if (state.screen === "intro") renderIntro();
+  else if (state.screen === "setup") renderSetup();
+  else if (state.screen === "board") renderBoard();
+  else if (state.screen === "final") renderFinal();
+}
+
+function renderIntro() {
+  const saved = loadSavedState();
+  const canResume = saved && saved.screen === "board" && Object.keys(saved.answered || {}).length < QUESTIONS.length;
+  app.innerHTML = `
+    <div class="intro-wrap">
+      <h1 class="game-title">Tandem Jeopardy!</h1>
+      <p class="subtitle">5 categories &middot; 25 questions &middot; teams take turns picking</p>
+      <div class="intro-rules">
+        <strong>How it works:</strong> Teams take turns choosing a question from the board.
+        Answer correctly to win that question\u2019s points; miss and you score zero \u2014 no penalties.
+        Every question reveals the correct answer before returning to the board.
+        Some questions ask you to <strong>select all that apply</strong>: you need the exact full set to score.
+        When the board is cleared, final rankings decide it all.
+      </div>
+      <div class="intro-buttons">
+        <button class="btn-primary" id="startBtn">Start</button>
+        ${canResume ? `<button class="btn-secondary" id="resumeBtn">Resume saved game</button>` : ""}
+      </div>
+    </div>`;
+  document.getElementById("startBtn").addEventListener("click", () => {
+    state.screen = "setup";
+    state.setupNames = state.setupNames.length ? state.setupNames : [];
+    render();
+  });
+  if (canResume) {
+    document.getElementById("resumeBtn").addEventListener("click", () => {
+      state.screen = saved.screen;
+      state.teamCount = saved.teamCount;
+      state.teams = saved.teams;
+      state.currentTeam = saved.currentTeam;
+      state.answered = saved.answered;
+      render();
+    });
+  }
+}
+
+function renderSetup() {
+  const n = state.teamCount;
+  let nameInputs = "";
+  for (let i = 0; i < n; i++) {
+    const val = state.setupNames[i] || "";
+    nameInputs += `<input class="name-input" id="team-name-${i}" maxlength="24"
+      placeholder="Team ${i + 1}" value="${esc(val)}">`;
+  }
+  app.innerHTML = `
+    <div class="setup-wrap">
+      <h1 class="game-title">Game Setup</h1>
+      <p class="subtitle">Choose your teams, then let\u2019s play</p>
+      <div class="setup-section">
+        <label class="setup-label">How many teams?</label>
+        <div class="count-row">
+          ${[3, 4, 5].map(c => `<button class="count-btn ${c === n ? "selected" : ""}" data-count="${c}">${c}</button>`).join("")}
+        </div>
+      </div>
+      <div class="setup-section">
+        <label class="setup-label">Team names</label>
+        ${nameInputs}
+      </div>
+      <div class="setup-tip">
+        Tip: Team 1 always picks first. With 3 or 4 teams, Team 1 also gets the extra
+        pick \u2014 a good spot for your online folks. With 5 teams, everyone gets exactly 5 picks.
+      </div>
+      <div class="center">
+        <button class="btn-primary" id="beginBtn">Start Game</button>
+      </div>
+    </div>`;
+
+  document.querySelectorAll(".count-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      captureSetupNames();
+      state.teamCount = parseInt(btn.dataset.count, 10);
+      renderSetup();
+    });
+  });
+  document.getElementById("beginBtn").addEventListener("click", () => {
+    captureSetupNames();
+    state.teams = [];
+    for (let i = 0; i < state.teamCount; i++) {
+      const nm = (state.setupNames[i] || "").trim();
+      state.teams.push({ name: nm || `Team ${i + 1}`, score: 0 });
+    }
+    state.currentTeam = 0;
+    state.answered = {};
+    state.screen = "board";
+    saveState();
+    render();
+  });
+}
+function captureSetupNames() {
+  for (let i = 0; i < state.teamCount; i++) {
+    const el = document.getElementById(`team-name-${i}`);
+    if (el) state.setupNames[i] = el.value;
+  }
+}
+
+function renderBoard() {
+  const chips = state.teams.map((t, i) => `
+    <div class="team-chip ${i === state.currentTeam ? "active" : ""}">
+      <div class="t-name">${i === state.currentTeam ? `<span class="turn-marker">\u25B6</span>` : ""}${esc(t.name)}</div>
+      <div class="t-score">${t.score}</div>
+    </div>`).join("");
+
+  let grid = CATEGORIES.map(c => `<div class="cat-header">${esc(c)}</div>`).join("");
+  for (const pts of POINT_ROWS) {
+    for (let c = 0; c < CATEGORIES.length; c++) {
+      const qi = qIndexFor(c, pts);
+      const done = state.answered[qi];
+      let backContent = "";
+      if (done) {
+        const teamName = esc(shortName(state.teams[done.team].name, 12));
+        backContent = done.correct
+          ? `<div class="taken-by">${teamName}</div><div class="taken-pts">+${QUESTIONS[qi].points}</div>`
+          : `<div class="taken-by">${teamName}</div><div class="taken-pts">\u2014</div>`;
+      }
+      grid += `
+        <div class="cell ${done ? "flipped" : ""}">
+          <div class="cell-inner">
+            <button class="cell-face cell-front" data-qi="${qi}" ${done ? "tabindex='-1' aria-hidden='true'" : ""}>${pts}</button>
+            <div class="cell-face cell-back ${done ? (done.correct ? "got" : "missed") : ""}">${backContent}</div>
+          </div>
+        </div>`;
+    }
+  }
+
+  app.innerHTML = `
+    <div class="board-header">
+      <div class="board-title">Tandem Jeopardy!</div>
+      <button class="restart-btn" id="restartBtn">\u27F2 Restart game</button>
+    </div>
+    <div class="scoreboard">${chips}</div>
+    <div class="turn-banner"><strong>${esc(state.teams[state.currentTeam].name)}</strong> \u2014 pick a question</div>
+    <div class="board-grid">${grid}</div>`;
+
+  document.querySelectorAll(".cell-front").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const qi = parseInt(btn.dataset.qi, 10);
+      if (state.answered[qi] !== undefined) return;
+      openQuestion(qi);
+    });
+  });
+  document.getElementById("restartBtn").addEventListener("click", () => {
+    if (confirm("Restart the game? All scores and progress will be lost.")) {
+      clearSavedState();
+      state = { screen: "intro", teamCount: 4, teams: [], currentTeam: 0, answered: {}, setupNames: [] };
+      render();
+    }
+  });
+}
+
+/* ---------- Question flow ---------- */
+function openQuestion(qi) {
+  activeQ = qi;
+  selection = new Set();
+  revealed = false;
+  lastResult = null;
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const q = QUESTIONS[activeQ];
+  const team = state.teams[state.currentTeam];
+  const isMA = q.type === "ma";
+  const markerShape = isMA ? "square" : "round";
+  const markerSymbol = isMA ? "\u2713" : "\u25CF";
+
+  const optionsHtml = q.options.map((opt, i) => {
+    let cls = "option-btn";
+    if (!revealed && selection.has(i)) cls += " selected";
+    if (revealed) {
+      const isCorrect = q.correct.includes(i);
+      const wasSelected = selection.has(i);
+      if (isCorrect) cls += " reveal-correct";
+      else if (wasSelected) cls += " reveal-wrong";
+    }
+    return `
+      <button class="${cls}" data-opt="${i}" ${revealed ? "disabled" : ""}>
+        <span class="marker ${markerShape}">${markerSymbol}</span>
+        <span>${esc(opt)}</span>
+      </button>`;
+  }).join("");
+
+  let footer;
+  if (!revealed) {
+    footer = `<div class="center">
+      <button class="btn-primary" id="submitBtn" ${selection.size === 0 ? "disabled" : ""}>Submit answer</button>
+    </div>`;
+  } else {
+    const banner = lastResult.correct
+      ? `<div class="result-banner win">Correct! ${esc(team.name)} wins ${q.points} points.</div>`
+      : `<div class="result-banner lose">Not this time \u2014 no points. The correct answer is highlighted in green.</div>`;
+    footer = `${banner}<div class="center">
+      <button class="btn-primary" id="backBtn">Back to board</button>
+    </div>`;
+  }
+
+  app.innerHTML = `
+    <div class="q-overlay">
+      <div class="q-card">
+        <div class="q-meta">
+          <div class="q-cat">${esc(q.category)} \u2014 ${q.points}</div>
+          <div class="q-answering">Answering: <strong>${esc(team.name)}</strong></div>
+        </div>
+        <div class="q-text">${esc(q.question)}</div>
+        ${isMA ? `<div class="q-hint">Select all that apply \u2014 you need the exact full set to score.</div>` : `<div class="q-hint spacer">&nbsp;</div>`}
+        <div class="options">${optionsHtml}</div>
+        ${footer}
+      </div>
+    </div>`;
+
+  if (!revealed) {
+    document.querySelectorAll(".option-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const i = parseInt(btn.dataset.opt, 10);
+        if (isMA) {
+          if (selection.has(i)) selection.delete(i); else selection.add(i);
+        } else {
+          selection.clear();
+          selection.add(i);
+        }
+        renderQuestion();
+      });
+    });
+    const submit = document.getElementById("submitBtn");
+    if (submit) submit.addEventListener("click", submitAnswer);
+  } else {
+    document.getElementById("backBtn").addEventListener("click", closeQuestion);
+  }
+}
+
+function submitAnswer() {
+  const q = QUESTIONS[activeQ];
+  const sel = Array.from(selection).sort((a, b) => a - b);
+  const cor = [...q.correct].sort((a, b) => a - b);
+  const isCorrect = sel.length === cor.length && sel.every((v, i) => v === cor[i]);
+
+  if (isCorrect) state.teams[state.currentTeam].score += q.points;
+  state.answered[activeQ] = { team: state.currentTeam, correct: isCorrect };
+  lastResult = { correct: isCorrect, points: q.points };
+  revealed = true;
+  saveState();
+  renderQuestion();
+}
+
+function closeQuestion() {
+  activeQ = null;
+  advanceTurn();
+  if (allAnswered()) {
+    state.screen = "final";
+    saveState();
+  }
+  saveState();
+  render();
+}
+
+/* ---------- Final ranking (shared ranks for ties) ---------- */
+function renderFinal() {
+  const sorted = state.teams
+    .map((t, i) => ({ ...t, idx: i }))
+    .sort((a, b) => b.score - a.score);
+
+  // Standard competition ranking: ties share a rank, next rank skips (1, 1, 3)
+  const ranks = [];
+  sorted.forEach((t, i) => {
+    ranks[i] = (i > 0 && t.score === sorted[i - 1].score) ? ranks[i - 1] : i + 1;
+  });
+  const topScore = sorted[0].score;
+
+  const rows = sorted.map((t, i) => {
+    const isWinner = t.score === topScore;
+    return `
+      <div class="final-row ${isWinner ? "winner" : ""}">
+        <div class="final-rank">${ranks[i]}</div>
+        <div class="final-name">${esc(t.name)}</div>
+        <div class="final-score">${t.score}</div>
+        ${isWinner ? `<div class="final-crown">\uD83C\uDFC6</div>` : ""}
+      </div>`;
+  }).join("");
+
+  const winners = sorted.filter(t => t.score === topScore).map(t => t.name);
+  const winLine = winners.length > 1
+    ? `It\u2019s a tie \u2014 congratulations ${winners.map(esc).join(" and ")}!`
+    : `Congratulations, ${esc(winners[0])}!`;
+
+  app.innerHTML = `
+    <div class="final-wrap">
+      <h1 class="game-title">Final Standings</h1>
+      <p class="subtitle">${winLine}</p>
+      <div class="final-list">${rows}</div>
+      <button class="btn-primary" id="againBtn">Play again</button>
+    </div>`;
+
+  document.getElementById("againBtn").addEventListener("click", () => {
+    clearSavedState();
+    const keepNames = state.teams.map(t => t.name);
+    state = {
+      screen: "setup", teamCount: keepNames.length, teams: [],
+      currentTeam: 0, answered: {}, setupNames: keepNames
+    };
+    render();
+  });
+}
+
+/* ---------- Boot ---------- */
+render();
+</script>
+</body>
+</html>
