@@ -380,6 +380,10 @@
   .final-score { font-size: 1.35rem; font-weight: 800; color: var(--gold); }
   .final-crown { font-size: 1.3rem; }
 
+  .t-score.negative,
+  .team-chip.active .t-score.negative,
+  .final-score.negative { color: #f0929a; }
+
   @media (max-width: 640px) {
     .cell { aspect-ratio: 1.6 / 1; }
     .team-chip { flex: 1 1 100px; min-width: 96px; padding: 8px 10px; }
@@ -418,7 +422,7 @@
      bump DATA_VERSION by 1 so old saved games are discarded.
    ===================================================================== */
 
-const DATA_VERSION = 1;
+const DATA_VERSION = 2;
 
 const CATEGORIES = ["General", "History", "Product", "Culture", "Diabetes"];
 
@@ -763,7 +767,7 @@ function renderBoard() {
   const chips = state.teams.map((t, i) => `
     <div class="team-chip ${i === state.currentTeam ? "active" : ""}">
       <div class="t-name">${i === state.currentTeam ? `<span class="turn-marker">\u25B6</span>` : ""}${esc(t.name)}</div>
-      <div class="t-score">${t.score}</div>
+      <div class="t-score ${t.score < 0 ? "negative" : ""}">${t.score}</div>
     </div>`).join("");
 
   let grid = CATEGORIES.map(c => `<div class="cat-header">${esc(c)}</div>`).join("");
@@ -776,7 +780,7 @@ function renderBoard() {
         const teamName = esc(shortName(state.teams[done.team].name, 12));
         backContent = done.correct
           ? `<div class="taken-by">${teamName}</div><div class="taken-pts">+${QUESTIONS[qi].points}</div>`
-          : `<div class="taken-by">${teamName}</div><div class="taken-pts">\u2014</div>`;
+          : `<div class="taken-by">${teamName}</div><div class="taken-pts">-${Math.round(QUESTIONS[qi].points / 2)}</div>`;
       }
       grid += `
         <div class="cell ${done ? "flipped" : ""}">
@@ -853,7 +857,7 @@ function renderQuestion() {
   } else {
     const banner = lastResult.correct
       ? `<div class="result-banner win">Correct! ${esc(team.name)} wins ${q.points} points.</div>`
-      : `<div class="result-banner lose">Not this time \u2014 no points. The correct answer is highlighted in green.</div>`;
+      : `<div class="result-banner lose">Not this time. ${esc(team.name)} loses ${lastResult.penalty} points. The correct answer is highlighted in green.</div>`;
     footer = `${banner}<div class="center">
       <button class="btn-primary" id="backBtn">Back to board</button>
     </div>`;
@@ -899,9 +903,11 @@ function submitAnswer() {
   const cor = [...q.correct].sort((a, b) => a - b);
   const isCorrect = sel.length === cor.length && sel.every((v, i) => v === cor[i]);
 
+  const penalty = Math.round(q.points / 2);
   if (isCorrect) state.teams[state.currentTeam].score += q.points;
+  else state.teams[state.currentTeam].score -= penalty;
   state.answered[activeQ] = { team: state.currentTeam, correct: isCorrect };
-  lastResult = { correct: isCorrect, points: q.points };
+  lastResult = { correct: isCorrect, points: q.points, penalty: penalty };
   revealed = true;
   saveState();
   renderQuestion();
@@ -937,7 +943,7 @@ function renderFinal() {
       <div class="final-row ${isWinner ? "winner" : ""}">
         <div class="final-rank">${ranks[i]}</div>
         <div class="final-name">${esc(t.name)}</div>
-        <div class="final-score">${t.score}</div>
+        <div class="final-score ${t.score < 0 ? "negative" : ""}">${t.score}</div>
         ${isWinner ? `<div class="final-crown">\uD83C\uDFC6</div>` : ""}
       </div>`;
   }).join("");
